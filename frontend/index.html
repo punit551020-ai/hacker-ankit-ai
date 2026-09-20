@@ -1,0 +1,484 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+    >
+
+    <meta
+        name="description"
+        content="Hacker Ankit AI - Smart AI assistant"
+    >
+
+    <title>HACKER ANKIT AI</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- =========================
+         LOGIN SCREEN
+    ========================== -->
+    <section id="loginScreen" class="screen login-screen">
+
+        <div class="login-glow"></div>
+
+        <div class="login-card">
+
+            <div class="brand">
+                <div class="brand-main">HACKER ANKIT</div>
+                <div class="brand-ai">AI</div>
+            </div>
+
+            <p class="tagline">
+                YOUR SMART AI ASSISTANT
+            </p>
+
+            <div class="login-form">
+
+                <label for="nameInput">
+                    ENTER YOUR NAME
+                </label>
+
+                <input
+                    id="nameInput"
+                    type="text"
+                    placeholder="Enter your name..."
+                    autocomplete="name"
+                    maxlength="40"
+                >
+
+                <button id="loginBtn" type="button">
+                    <span>LOGIN</span>
+                    <span class="button-arrow">➜</span>
+                </button>
+
+                <p id="loginError" class="error-message"></p>
+
+            </div>
+
+            <div class="login-info">
+                Your name will be remembered on this device.
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         MAIN AI APPLICATION
+    ========================== -->
+    <section id="appScreen" class="app-screen hidden">
+
+        <!-- TOP BAR -->
+        <header class="topbar">
+
+            <div class="top-brand">
+                <div class="top-brand-name">HACKER ANKIT</div>
+                <div class="top-brand-ai">AI</div>
+            </div>
+
+            <div class="top-actions">
+
+                <button
+                    id="voiceToggleBtn"
+                    class="icon-btn active"
+                    title="Toggle AI voice"
+                    type="button"
+                >
+                    🔊
+                </button>
+
+                <button
+                    id="newChatBtn"
+                    class="new-chat-btn"
+                    type="button"
+                >
+                    ＋ New Chat
+                </button>
+
+                <button
+                    id="menuBtn"
+                    class="icon-btn mobile-menu-btn"
+                    type="button"
+                >
+                    ☰
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- MAIN LAYOUT -->
+        <div class="main-layout">
+
+
+            <!-- =====================
+                 SIDEBAR
+            ====================== -->
+            <aside id="sidebar" class="sidebar">
+
+                <button
+                    id="sidebarNewChatBtn"
+                    class="sidebar-new-chat"
+                    type="button"
+                >
+                    ＋ New Chat
+                </button>
+
+
+                <div class="sidebar-section">
+
+                    <div class="sidebar-title">
+                        AI TOOLS
+                    </div>
+
+                    <button
+                        class="tool-btn"
+                        data-tool="chat"
+                        type="button"
+                    >
+                        💬
+                        <span>AI Chat</span>
+                    </button>
+
+                    <button
+                        class="tool-btn"
+                        data-tool="image"
+                        type="button"
+                    >
+                        🎨
+                        <span>Image AI</span>
+                    </button>
+
+                    <button
+                        class="tool-btn"
+                        data-tool="vision"
+                        type="button"
+                    >
+                        👁️
+                        <span>Image Analysis</span>
+                    </button>
+
+                </div>
+
+
+                <div class="sidebar-section history-section">
+
+                    <div class="sidebar-title">
+                        RECENT CHATS
+                    </div>
+
+                    <div id="historyList" class="history-list">
+                        <div class="empty-history">
+                            No chats yet
+                        </div>
+                    </div>
+
+                </div>
+
+
+                <div class="sidebar-bottom">
+
+                    <div class="user-profile">
+
+                        <div id="userAvatar" class="user-avatar">
+                            U
+                        </div>
+
+                        <div class="user-details">
+
+                            <div id="userNameDisplay">
+                                User
+                            </div>
+
+                            <span>
+                                AI USER
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                    <button
+                        id="logoutBtn"
+                        class="logout-btn"
+                        type="button"
+                    >
+                        Logout
+                    </button>
+
+                </div>
+
+            </aside>
+
+
+            <!-- =====================
+                 CHAT AREA
+            ====================== -->
+            <main class="chat-area">
+
+                <div id="welcomeScreen" class="welcome-screen">
+
+                    <div class="welcome-logo">
+                        <div>HACKER ANKIT</div>
+                        <strong>AI</strong>
+                    </div>
+
+                    <h1 id="welcomeTitle">
+                        Hello 👋
+                    </h1>
+
+                    <p>
+                        Ask me anything. I can help with questions,
+                        images, ideas, coding and more.
+                    </p>
+
+
+                    <div class="quick-prompts">
+
+                        <button
+                            class="quick-prompt"
+                            data-prompt="Explain artificial intelligence in simple Hindi."
+                            type="button"
+                        >
+                            🧠 Explain AI
+                        </button>
+
+                        <button
+                            class="quick-prompt"
+                            data-prompt="Give me a creative image prompt for a futuristic city."
+                            type="button"
+                        >
+                            🎨 Create Image Prompt
+                        </button>
+
+                        <button
+                            class="quick-prompt"
+                            data-prompt="Help me write a professional website."
+                            type="button"
+                        >
+                            💻 Website Help
+                        </button>
+
+                        <button
+                            class="quick-prompt"
+                            data-prompt="Tell me an interesting fact."
+                            type="button"
+                        >
+                            ⚡ Interesting Fact
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- MESSAGES -->
+                <div
+                    id="messages"
+                    class="messages"
+                    aria-live="polite"
+                >
+                </div>
+
+
+                <!-- IMAGE PREVIEW -->
+                <div
+                    id="imagePreviewBox"
+                    class="image-preview-box hidden"
+                >
+
+                    <div class="preview-header">
+                        <span>Attached Image</span>
+
+                        <button
+                            id="removeImageBtn"
+                            type="button"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    <img
+                        id="imagePreview"
+                        src=""
+                        alt="Selected image preview"
+                    >
+
+                </div>
+
+
+                <!-- TYPING INDICATOR -->
+                <div
+                    id="typingIndicator"
+                    class="typing-indicator hidden"
+                >
+                    <div class="typing-avatar">
+                        AI
+                    </div>
+
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+
+                    <span class="typing-text">
+                        AI is thinking...
+                    </span>
+                </div>
+
+
+                <!-- INPUT AREA -->
+                <div class="input-container">
+
+                    <div class="input-box">
+
+                        <!-- Image upload -->
+                        <label
+                            for="imageInput"
+                            class="input-icon"
+                            title="Upload image"
+                        >
+                            📎
+                        </label>
+
+                        <input
+                            id="imageInput"
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            hidden
+                        >
+
+
+                        <!-- Text input -->
+                        <textarea
+                            id="messageInput"
+                            rows="1"
+                            maxlength="10000"
+                            placeholder="Ask HACKER ANKIT AI anything..."
+                        ></textarea>
+
+
+                        <!-- Microphone -->
+                        <button
+                            id="micBtn"
+                            class="input-icon"
+                            title="Speak"
+                            type="button"
+                        >
+                            🎤
+                        </button>
+
+
+                        <!-- Send -->
+                        <button
+                            id="sendBtn"
+                            class="send-btn"
+                            title="Send message"
+                            type="button"
+                        >
+                            ➜
+                        </button>
+
+                    </div>
+
+                    <div class="input-hint">
+                        AI can make mistakes. Check important information.
+                    </div>
+
+                </div>
+
+            </main>
+
+        </div>
+
+
+        <!-- MOBILE OVERLAY -->
+        <div
+            id="sidebarOverlay"
+            class="sidebar-overlay hidden"
+        ></div>
+
+    </section>
+
+
+    <!-- =========================
+         IMAGE GENERATION MODAL
+    ========================== -->
+    <div
+        id="imageModal"
+        class="modal hidden"
+    >
+
+        <div class="modal-card">
+
+            <button
+                id="closeImageModal"
+                class="modal-close"
+                type="button"
+            >
+                ✕
+            </button>
+
+            <div class="modal-icon">
+                🎨
+            </div>
+
+            <h2>AI IMAGE GENERATOR</h2>
+
+            <p>
+                Describe the image you want to create.
+            </p>
+
+            <textarea
+                id="imagePromptInput"
+                placeholder="Example: A cinematic futuristic city at night, neon lights, realistic..."
+                maxlength="5000"
+            ></textarea>
+
+            <button
+                id="generateImageBtn"
+                class="generate-btn"
+                type="button"
+            >
+                ✨ GENERATE IMAGE
+            </button>
+
+            <div
+                id="imageGenerationStatus"
+                class="generation-status"
+            ></div>
+
+            <div
+                id="generatedImageContainer"
+                class="generated-image-container hidden"
+            >
+                <img
+                    id="generatedImage"
+                    src=""
+                    alt="AI generated image"
+                >
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         JAVASCRIPT
+    ========================== -->
+    <script src="app.js"></script>
+
+</body>
+</html>
+
