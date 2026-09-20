@@ -1,7 +1,9 @@
+````javascript
 /* =========================================================
    HACKER ANKIT AI
    FRONTEND APPLICATION
    CHAT + IMAGE GENERATION
+   STORAGE-SAFE VERSION
 ========================================================= */
 
 "use strict";
@@ -11,6 +13,15 @@
 ========================================================= */
 
 const API_BASE_URL = "";
+
+/*
+ * Storage limits
+ * IMPORTANT:
+ * Base64 images are NEVER saved into localStorage.
+ */
+const MAX_HISTORY_CHATS = 10;
+const MAX_MESSAGES_PER_CHAT = 30;
+const MAX_HISTORY_TEXT_LENGTH = 6000;
 
 
 /* =========================================================
@@ -73,30 +84,236 @@ const generatedImage =
 
 
 /* =========================================================
+   SAFE STORAGE HELPERS
+========================================================= */
+
+function safeGet(key, fallback = "") {
+
+    try {
+        const value = localStorage.getItem(key);
+
+        return value === null
+            ? fallback
+            : value;
+
+    } catch (error) {
+
+        console.warn(
+            "⚠️ localStorage read failed:",
+            error
+        );
+
+        return fallback;
+    }
+}
+
+
+function safeSet(key, value) {
+
+    try {
+
+        localStorage.setItem(
+            key,
+            value
+        );
+
+        return true;
+
+    } catch (error) {
+
+        console.warn(
+            "⚠️ localStorage write failed:",
+            error
+        );
+
+        /*
+         * If storage is full, remove old chat history
+         * and try once more.
+         */
+        try {
+
+            localStorage.removeItem(
+                "hackerAnkitChatHistory"
+            );
+
+            localStorage.removeItem(
+                "hackerAnkitDraft"
+            );
+
+            localStorage.setItem(
+                key,
+                value
+            );
+
+            return true;
+
+        } catch (secondError) {
+
+            console.error(
+                "❌ Storage quota exceeded:",
+                secondError
+            );
+
+            return false;
+        }
+    }
+}
+
+
+function safeRemove(key) {
+
+    try {
+
+        localStorage.removeItem(
+            key
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "⚠️ localStorage remove failed:",
+            error
+        );
+    }
+}
+
+
+/* =========================================================
    STATE
 ========================================================= */
 
 let currentUser =
-    localStorage.getItem("hackerAnkitUser") || "";
+    safeGet(
+        "hackerAnkitUser",
+        ""
+    );
 
 let currentImage = null;
 
 let voiceEnabled =
-    localStorage.getItem("hackerAnkitVoice") !== "false";
+    safeGet(
+        "hackerAnkitVoice",
+        "true"
+    ) !== "false";
 
 let currentChat = [];
 
 let chatHistory = [];
 
-try {
-    chatHistory = JSON.parse(
-        localStorage.getItem(
-            "hackerAnkitChatHistory"
-        ) || "[]"
-    );
-} catch {
-    chatHistory = [];
+
+/* =========================================================
+   LOAD CHAT HISTORY SAFELY
+========================================================= */
+
+function loadChatHistory() {
+
+    try {
+
+        const raw =
+            localStorage.getItem(
+                "hackerAnkitChatHistory"
+            );
+
+        if (!raw) {
+            return [];
+        }
+
+        const parsed =
+            JSON.parse(raw);
+
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        /*
+         * Remove old/invalid records.
+         * Also remove any Base64 image data that
+         * might exist in an older version.
+         */
+        return parsed
+            .filter(
+                chat =>
+                    chat &&
+                    Array.isArray(
+                        chat.messages
+                    )
+            )
+            .slice(
+                0,
+                MAX_HISTORY_CHATS
+            )
+            .map(
+                chat => ({
+
+                    id:
+                        chat.id ||
+                        Date.now(),
+
+                    title:
+                        String(
+                            chat.title ||
+                            "New Chat"
+                        ).slice(
+                            0,
+                            80
+                        ),
+
+                    createdAt:
+                        chat.createdAt ||
+                        Date.now(),
+
+                    messages:
+                        chat.messages
+                            .slice(
+                                0,
+                                MAX_MESSAGES_PER_CHAT
+                            )
+                            .map(
+                                item => ({
+
+                                    role:
+                                        item.role ===
+                                        "assistant"
+                                            ? "assistant"
+                                            : "user",
+
+                                    content:
+                                        String(
+                                            item.content ||
+                                            ""
+                                        ).slice(
+                                            0,
+                                            MAX_HISTORY_TEXT_LENGTH
+                                        ),
+
+                                    timestamp:
+                                        item.timestamp ||
+                                        Date.now(),
+
+                                    /*
+                                     * IMPORTANT:
+                                     * Never restore Base64 images.
+                                     */
+                                    image: null
+                                })
+                            )
+                })
+            );
+
+    } catch (error) {
+
+        console.warn(
+            "⚠️ Could not load chat history:",
+            error
+        );
+
+        return [];
+    }
 }
+
+
+chatHistory =
+    loadChatHistory();
 
 
 /* =========================================================
@@ -120,7 +337,7 @@ document.addEventListener(
         renderHistory();
 
         console.log(
-            "HACKER ANKIT AI frontend loaded."
+            "✅ HACKER ANKIT AI frontend loaded."
         );
     }
 );
@@ -131,18 +348,24 @@ document.addEventListener(
 ========================================================= */
 
 if (loginBtn) {
+
     loginBtn.addEventListener(
         "click",
         login
     );
 }
 
+
 if (nameInput) {
+
     nameInput.addEventListener(
         "keydown",
         event => {
+
             if (event.key === "Enter") {
+
                 event.preventDefault();
+
                 login();
             }
         }
@@ -175,20 +398,29 @@ function login() {
         return;
     }
 
-    currentUser = name;
+    currentUser =
+        name.slice(
+            0,
+            80
+        );
 
-    localStorage.setItem(
+    safeSet(
         "hackerAnkitUser",
         currentUser
     );
 
-    loginError.textContent = "";
+    loginError.textContent =
+        "";
 
     showApp();
 }
 
 
 function showLogin() {
+
+    if (!loginScreen || !appScreen) {
+        return;
+    }
 
     loginScreen.classList.remove(
         "hidden"
@@ -200,9 +432,11 @@ function showLogin() {
 
     setTimeout(
         () => {
+
             if (nameInput) {
                 nameInput.focus();
             }
+
         },
         100
     );
@@ -210,6 +444,10 @@ function showLogin() {
 
 
 function showApp() {
+
+    if (!loginScreen || !appScreen) {
+        return;
+    }
 
     loginScreen.classList.add(
         "hidden"
@@ -234,19 +472,23 @@ function showApp() {
 function updateUserUI() {
 
     const firstLetter =
-        currentUser.charAt(0).toUpperCase() || "U";
+        currentUser.charAt(0).toUpperCase() ||
+        "U";
 
     if (userAvatar) {
+
         userAvatar.textContent =
             firstLetter;
     }
 
     if (userNameDisplay) {
+
         userNameDisplay.textContent =
             currentUser || "User";
     }
 
     if (welcomeTitle) {
+
         welcomeTitle.textContent =
             `Hello ${currentUser} 👋`;
     }
@@ -272,8 +514,12 @@ if (logoutBtn) {
                 return;
             }
 
-            localStorage.removeItem(
+            safeRemove(
                 "hackerAnkitUser"
+            );
+
+            safeRemove(
+                "hackerAnkitDraft"
             );
 
             currentUser = "";
@@ -302,6 +548,7 @@ if (newChatBtn) {
     );
 }
 
+
 if (sidebarNewChatBtn) {
 
     sidebarNewChatBtn.addEventListener(
@@ -314,6 +561,7 @@ if (sidebarNewChatBtn) {
 function startNewChat() {
 
     if (currentChat.length > 0) {
+
         saveCurrentChatToHistory();
     }
 
@@ -321,16 +569,12 @@ function startNewChat() {
 
     clearMessages();
 
-    currentImage = null;
-
-    if (imagePreviewBox) {
-        imagePreviewBox.classList.add(
-            "hidden"
-        );
-    }
+    removeSelectedImage();
 
     if (messageInput) {
-        messageInput.value = "";
+
+        messageInput.value =
+            "";
     }
 
     autoResizeTextarea();
@@ -338,6 +582,7 @@ function startNewChat() {
     closeSidebar();
 
     if (messageInput) {
+
         messageInput.focus();
     }
 }
@@ -353,9 +598,11 @@ function clearMessages() {
         return;
     }
 
-    messages.innerHTML = "";
+    messages.innerHTML =
+        "";
 
     if (welcomeScreen) {
+
         welcomeScreen.classList.remove(
             "hidden"
         );
@@ -366,6 +613,7 @@ function clearMessages() {
 function hideWelcome() {
 
     if (welcomeScreen) {
+
         welcomeScreen.classList.add(
             "hidden"
         );
@@ -384,6 +632,7 @@ if (sendBtn) {
         sendMessage
     );
 }
+
 
 if (messageInput) {
 
@@ -423,28 +672,44 @@ async function sendMessage() {
     const imageForMessage =
         currentImage;
 
+    /*
+     * Display uploaded image on screen.
+     */
     addMessage(
         "user",
         userText,
         imageForMessage
     );
 
+    /*
+     * IMPORTANT:
+     * Do NOT store Base64 image inside currentChat.
+     */
     currentChat.push({
-        role: "user",
-        content: userText,
-        image: imageForMessage
-            ? imageForMessage.data
-            : null,
-        timestamp: Date.now()
+
+        role:
+            "user",
+
+        content:
+            userText,
+
+        image:
+            null,
+
+        timestamp:
+            Date.now()
     });
 
-    messageInput.value = "";
+    messageInput.value =
+        "";
 
     autoResizeTextarea();
 
-    currentImage = null;
+    currentImage =
+        null;
 
     if (imagePreviewBox) {
+
         imagePreviewBox.classList.add(
             "hidden"
         );
@@ -473,14 +738,24 @@ async function sendMessage() {
         );
 
         currentChat.push({
-            role: "assistant",
-            content: answer,
-            timestamp: Date.now()
+
+            role:
+                "assistant",
+
+            content:
+                answer,
+
+            image:
+                null,
+
+            timestamp:
+                Date.now()
         });
 
         saveCurrentChatToHistory();
 
         if (voiceEnabled) {
+
             speakText(answer);
         }
 
@@ -495,8 +770,10 @@ async function sendMessage() {
 
         const errorMessage =
             "❌ AI server error: " +
-            (error.message ||
-                "Unknown error");
+            (
+                error.message ||
+                "Unknown error"
+            );
 
         addMessage(
             "assistant",
@@ -517,22 +794,38 @@ async function callChatAPI(
 
     const payload = {
 
-        name: currentUser,
+        name:
+            currentUser,
 
-        message: text,
+        message:
+            text,
 
         image:
             image
                 ? image.data
                 : null,
 
+        /*
+         * Send only recent text history.
+         * Never send stored Base64 images.
+         */
         history:
             currentChat
                 .slice(-12)
                 .map(
                     item => ({
-                        role: item.role,
-                        content: item.content
+
+                        role:
+                            item.role,
+
+                        content:
+                            String(
+                                item.content ||
+                                ""
+                            ).slice(
+                                0,
+                                MAX_HISTORY_TEXT_LENGTH
+                            )
                     })
                 )
     };
@@ -541,9 +834,11 @@ async function callChatAPI(
         await fetch(
             `${API_BASE_URL}/api/chat`,
             {
-                method: "POST",
+                method:
+                    "POST",
 
                 headers: {
+
                     "Content-Type":
                         "application/json"
                 },
@@ -555,13 +850,18 @@ async function callChatAPI(
             }
         );
 
-    let data = null;
+    let data =
+        null;
 
     try {
+
         data =
             await response.json();
+
     } catch {
-        data = null;
+
+        data =
+            null;
     }
 
     if (!response.ok) {
@@ -582,10 +882,15 @@ function extractTextFromResponse(
 ) {
 
     if (!data) {
+
         return "मुझे कोई जवाब नहीं मिला।";
     }
 
-    if (typeof data === "string") {
+    if (
+        typeof data ===
+        "string"
+    ) {
+
         return data;
     }
 
@@ -614,13 +919,17 @@ function addMessage(
     }
 
     const message =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     message.className =
         `message ${role}`;
 
     const avatar =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     avatar.className =
         "message-avatar";
@@ -630,12 +939,15 @@ function addMessage(
             ? (
                 currentUser
                     .charAt(0)
-                    .toUpperCase() || "U"
+                    .toUpperCase() ||
+                "U"
             )
             : "AI";
 
     const content =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     content.className =
         "message-content";
@@ -643,7 +955,9 @@ function addMessage(
     if (image) {
 
         const img =
-            document.createElement("img");
+            document.createElement(
+                "img"
+            );
 
         img.src =
             image.data;
@@ -672,7 +986,9 @@ function addMessage(
     }
 
     const textElement =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     textElement.textContent =
         text;
@@ -684,13 +1000,17 @@ function addMessage(
     if (role === "assistant") {
 
         const actions =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
         actions.className =
             "message-actions";
 
         const copyButton =
-            document.createElement("button");
+            document.createElement(
+                "button"
+            );
 
         copyButton.className =
             "message-action";
@@ -704,12 +1024,15 @@ function addMessage(
         copyButton.addEventListener(
             "click",
             () => {
+
                 copyText(text);
             }
         );
 
         const speakButton =
-            document.createElement("button");
+            document.createElement(
+                "button"
+            );
 
         speakButton.className =
             "message-action";
@@ -723,6 +1046,7 @@ function addMessage(
         speakButton.addEventListener(
             "click",
             () => {
+
                 speakText(text);
             }
         );
@@ -776,7 +1100,9 @@ async function copyText(
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            error
+        );
 
         showToast(
             "Copy failed"
@@ -819,7 +1145,8 @@ function handleImageUpload(
             "Please select an image."
         );
 
-        imageInput.value = "";
+        imageInput.value =
+            "";
 
         return;
     }
@@ -833,7 +1160,8 @@ function handleImageUpload(
             "Image must be smaller than 10 MB."
         );
 
-        imageInput.value = "";
+        imageInput.value =
+            "";
 
         return;
     }
@@ -841,38 +1169,42 @@ function handleImageUpload(
     const reader =
         new FileReader();
 
-    reader.onload = () => {
+    reader.onload =
+        () => {
 
-        currentImage = {
+            currentImage = {
 
-            name:
-                file.name,
+                name:
+                    file.name,
 
-            type:
-                file.type,
+                type:
+                    file.type,
 
-            data:
-                reader.result
+                data:
+                    reader.result
+            };
+
+            if (imagePreview) {
+
+                imagePreview.src =
+                    reader.result;
+            }
+
+            if (imagePreviewBox) {
+
+                imagePreviewBox.classList.remove(
+                    "hidden"
+                );
+            }
         };
 
-        if (imagePreview) {
-            imagePreview.src =
-                reader.result;
-        }
+    reader.onerror =
+        () => {
 
-        if (imagePreviewBox) {
-            imagePreviewBox.classList.remove(
-                "hidden"
+            showToast(
+                "Could not read the image."
             );
-        }
-    };
-
-    reader.onerror = () => {
-
-        showToast(
-            "Could not read the image."
-        );
-    };
+        };
 
     reader.readAsDataURL(
         file
@@ -891,17 +1223,23 @@ if (removeImageBtn) {
 
 function removeSelectedImage() {
 
-    currentImage = null;
+    currentImage =
+        null;
 
     if (imageInput) {
-        imageInput.value = "";
+
+        imageInput.value =
+            "";
     }
 
     if (imagePreview) {
-        imagePreview.src = "";
+
+        imagePreview.src =
+            "";
     }
 
     if (imagePreviewBox) {
+
         imagePreviewBox.classList.add(
             "hidden"
         );
@@ -913,9 +1251,11 @@ function removeSelectedImage() {
    MICROPHONE
 ========================================================= */
 
-let recognition = null;
+let recognition =
+    null;
 
-let isListening = false;
+let isListening =
+    false;
 
 const SpeechRecognition =
     window.SpeechRecognition ||
@@ -935,18 +1275,21 @@ if (SpeechRecognition) {
     recognition.interimResults =
         true;
 
-    recognition.onstart = () => {
+    recognition.onstart =
+        () => {
 
-        isListening = true;
+            isListening =
+                true;
 
-        if (micBtn) {
-            micBtn.textContent =
-                "🔴";
+            if (micBtn) {
 
-            micBtn.title =
-                "Listening...";
-        }
-    };
+                micBtn.textContent =
+                    "🔴";
+
+                micBtn.title =
+                    "Listening...";
+            }
+        };
 
     recognition.onresult =
         event => {
@@ -968,6 +1311,7 @@ if (SpeechRecognition) {
             }
 
             if (messageInput) {
+
                 messageInput.value =
                     transcript;
 
@@ -991,9 +1335,11 @@ if (SpeechRecognition) {
     recognition.onend =
         () => {
 
-            isListening = false;
+            isListening =
+                false;
 
             if (micBtn) {
+
                 micBtn.textContent =
                     "🎤";
 
@@ -1037,7 +1383,9 @@ function toggleMicrophone() {
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            error
+        );
     }
 }
 
@@ -1055,7 +1403,7 @@ if (voiceToggleBtn) {
             voiceEnabled =
                 !voiceEnabled;
 
-            localStorage.setItem(
+            safeSet(
                 "hackerAnkitVoice",
                 String(
                     voiceEnabled
@@ -1127,7 +1475,7 @@ function speakText(
     window.speechSynthesis.cancel();
 
     const cleanText =
-        text
+        String(text)
             .replace(
                 /```[\s\S]*?```/g,
                 ""
@@ -1206,6 +1554,7 @@ toolButtons.forEach(
                     );
 
                     if (imageInput) {
+
                         imageInput.click();
                     }
 
@@ -1217,6 +1566,7 @@ toolButtons.forEach(
                 ) {
 
                     if (messageInput) {
+
                         messageInput.focus();
                     }
 
@@ -1239,6 +1589,7 @@ function openImageModal() {
     );
 
     if (imagePromptInput) {
+
         imagePromptInput.focus();
     }
 }
@@ -1306,10 +1657,15 @@ async function generateImage() {
     if (!prompt) {
 
         if (imageGenerationStatus) {
+
             imageGenerationStatus.textContent =
                 "Please describe the image.";
         }
 
+        return;
+    }
+
+    if (!generateImageBtn) {
         return;
     }
 
@@ -1319,12 +1675,18 @@ async function generateImage() {
     generateImageBtn.textContent =
         "GENERATING...";
 
-    imageGenerationStatus.textContent =
-        "🖼️ AI is creating your image...";
+    if (imageGenerationStatus) {
 
-    generatedImageContainer.classList.add(
-        "hidden"
-    );
+        imageGenerationStatus.textContent =
+            "🖼️ AI is creating your image...";
+    }
+
+    if (generatedImageContainer) {
+
+        generatedImageContainer.classList.add(
+            "hidden"
+        );
+    }
 
     try {
 
@@ -1337,15 +1699,18 @@ async function generateImage() {
             await fetch(
                 `${API_BASE_URL}/api/generate-image`,
                 {
-                    method: "POST",
+                    method:
+                        "POST",
 
                     headers: {
+
                         "Content-Type":
                             "application/json"
                     },
 
                     body:
                         JSON.stringify({
+
                             name:
                                 currentUser,
 
@@ -1355,7 +1720,8 @@ async function generateImage() {
                 }
             );
 
-        let data = null;
+        let data =
+            null;
 
         try {
 
@@ -1364,7 +1730,8 @@ async function generateImage() {
 
         } catch {
 
-            data = null;
+            data =
+                null;
         }
 
         console.log(
@@ -1399,15 +1766,24 @@ async function generateImage() {
             );
         }
 
-        generatedImage.src =
-            imageUrl;
+        if (generatedImage) {
 
-        generatedImageContainer.classList.remove(
-            "hidden"
-        );
+            generatedImage.src =
+                imageUrl;
+        }
 
-        imageGenerationStatus.textContent =
-            "✅ Image generated successfully.";
+        if (generatedImageContainer) {
+
+            generatedImageContainer.classList.remove(
+                "hidden"
+            );
+        }
+
+        if (imageGenerationStatus) {
+
+            imageGenerationStatus.textContent =
+                "✅ Image generated successfully.";
+        }
 
     } catch (error) {
 
@@ -1416,9 +1792,15 @@ async function generateImage() {
             error
         );
 
-        imageGenerationStatus.textContent =
-            "❌ Image generation failed:\n" +
-            error.message;
+        if (imageGenerationStatus) {
+
+            imageGenerationStatus.textContent =
+                "❌ Image generation failed:\n" +
+                (
+                    error.message ||
+                    "Unknown error"
+                );
+        }
 
     } finally {
 
@@ -1535,6 +1917,7 @@ function scrollMessages() {
 
     requestAnimationFrame(
         () => {
+
             messages.scrollTop =
                 messages.scrollHeight;
         }
@@ -1554,8 +1937,44 @@ function saveCurrentChatToHistory() {
         return;
     }
 
+    /*
+     * Create a CLEAN copy.
+     * Absolutely no Base64 image data.
+     */
+    const cleanMessages =
+        currentChat
+            .slice(
+                -MAX_MESSAGES_PER_CHAT
+            )
+            .map(
+                item => ({
+
+                    role:
+                        item.role ===
+                        "assistant"
+                            ? "assistant"
+                            : "user",
+
+                    content:
+                        String(
+                            item.content ||
+                            ""
+                        ).slice(
+                            0,
+                            MAX_HISTORY_TEXT_LENGTH
+                        ),
+
+                    timestamp:
+                        item.timestamp ||
+                        Date.now(),
+
+                    image:
+                        null
+                })
+            );
+
     const firstUserMessage =
-        currentChat.find(
+        cleanMessages.find(
             item =>
                 item.role === "user"
         );
@@ -1563,7 +1982,10 @@ function saveCurrentChatToHistory() {
     const title =
         firstUserMessage
             ? firstUserMessage.content
-                .slice(0, 60)
+                .slice(
+                    0,
+                    60
+                )
             : "New Chat";
 
     const chatRecord = {
@@ -1575,11 +1997,22 @@ function saveCurrentChatToHistory() {
             title,
 
         messages:
-            currentChat,
+            cleanMessages,
 
         createdAt:
             Date.now()
     };
+
+    /*
+     * Remove duplicate record if the same
+     * current chat is being saved repeatedly.
+     */
+    chatHistory =
+        chatHistory.filter(
+            chat =>
+                chat.id !==
+                chatRecord.id
+        );
 
     chatHistory.unshift(
         chatRecord
@@ -1588,15 +2021,77 @@ function saveCurrentChatToHistory() {
     chatHistory =
         chatHistory.slice(
             0,
-            20
+            MAX_HISTORY_CHATS
         );
 
-    localStorage.setItem(
-        "hackerAnkitChatHistory",
-        JSON.stringify(
-            chatHistory
-        )
-    );
+    /*
+     * Try saving progressively smaller data
+     * if browser storage is full.
+     */
+    let saved =
+        safeSet(
+            "hackerAnkitChatHistory",
+            JSON.stringify(
+                chatHistory
+            )
+        );
+
+    if (!saved) {
+
+        /*
+         * Keep only last 5 chats.
+         */
+        chatHistory =
+            chatHistory.slice(
+                0,
+                5
+            );
+
+        saved =
+            safeSet(
+                "hackerAnkitChatHistory",
+                JSON.stringify(
+                    chatHistory
+                )
+            );
+    }
+
+    if (!saved) {
+
+        /*
+         * Last fallback:
+         * keep only current chat title
+         * and a few text messages.
+         */
+        const minimalHistory = [
+
+            {
+                id:
+                    chatRecord.id,
+
+                title:
+                    chatRecord.title,
+
+                createdAt:
+                    chatRecord.createdAt,
+
+                messages:
+                    cleanMessages.slice(
+                        -8
+                    )
+            }
+        ];
+
+        chatHistory =
+            minimalHistory;
+
+        safeSet(
+            "hackerAnkitChatHistory",
+            JSON.stringify(
+                minimalHistory
+            )
+        );
+    }
 
     renderHistory();
 }
@@ -1608,7 +2103,8 @@ function renderHistory() {
         return;
     }
 
-    historyList.innerHTML = "";
+    historyList.innerHTML =
+        "";
 
     if (
         chatHistory.length === 0
@@ -1647,7 +2143,8 @@ function renderHistory() {
                 "history-item";
 
             button.textContent =
-                chat.title;
+                chat.title ||
+                "New Chat";
 
             button.addEventListener(
                 "click",
@@ -1678,6 +2175,29 @@ function loadChat(
             chat.messages
         )
             ? chat.messages
+                .map(
+                    item => ({
+
+                        role:
+                            item.role ===
+                            "assistant"
+                                ? "assistant"
+                                : "user",
+
+                        content:
+                            String(
+                                item.content ||
+                                ""
+                            ),
+
+                        image:
+                            null,
+
+                        timestamp:
+                            item.timestamp ||
+                            Date.now()
+                    })
+                )
             : [];
 
     clearMessages();
@@ -1689,7 +2209,8 @@ function loadChat(
 
             addMessage(
                 item.role,
-                item.content
+                item.content,
+                null
             );
         }
     );
@@ -1708,13 +2229,19 @@ if (menuBtn) {
         "click",
         () => {
 
-            sidebar.classList.toggle(
-                "open"
-            );
+            if (sidebar) {
 
-            sidebarOverlay.classList.toggle(
-                "hidden"
-            );
+                sidebar.classList.toggle(
+                    "open"
+                );
+            }
+
+            if (sidebarOverlay) {
+
+                sidebarOverlay.classList.toggle(
+                    "hidden"
+                );
+            }
         }
     );
 }
@@ -1773,6 +2300,7 @@ function showToast(
         Object.assign(
             toast.style,
             {
+
                 position:
                     "fixed",
 
@@ -1835,7 +2363,9 @@ function showToast(
     toast._timer =
         setTimeout(
             () => {
+
                 toast.remove();
+
             },
             4000
         );
@@ -1851,8 +2381,10 @@ document.addEventListener(
     event => {
 
         if (
-            (event.metaKey ||
-                event.ctrlKey) &&
+            (
+                event.metaKey ||
+                event.ctrlKey
+            ) &&
             event.key.toLowerCase() ===
                 "k"
         ) {
@@ -1860,12 +2392,14 @@ document.addEventListener(
             event.preventDefault();
 
             if (messageInput) {
+
                 messageInput.focus();
             }
         }
 
         if (
-            event.key === "Escape"
+            event.key ===
+            "Escape"
         ) {
 
             closeImageGenerator();
@@ -1880,25 +2414,123 @@ document.addEventListener(
    SAVE DRAFT
 ========================================================= */
 
+/*
+ * IMPORTANT:
+ * Do NOT save the whole currentChat automatically.
+ * It can become large and cause storage quota errors.
+ *
+ * We only save the last 3 TEXT messages.
+ */
 window.addEventListener(
     "beforeunload",
     () => {
 
-        if (
-            currentChat.length > 0
-        ) {
+        try {
 
-            localStorage.setItem(
+            if (
+                currentChat.length === 0
+            ) {
+                return;
+            }
+
+            const smallDraft =
+                currentChat
+                    .slice(
+                        -3
+                    )
+                    .map(
+                        item => ({
+
+                            role:
+                                item.role,
+
+                            content:
+                                String(
+                                    item.content ||
+                                    ""
+                                ).slice(
+                                    0,
+                                    2000
+                                )
+                        })
+                    );
+
+            safeSet(
                 "hackerAnkitDraft",
                 JSON.stringify(
-                    currentChat
+                    smallDraft
                 )
+            );
+
+        } catch (error) {
+
+            console.warn(
+                "⚠️ Draft save skipped:",
+                error
             );
         }
     }
 );
 
 
+/* =========================================================
+   CLEAN OLD STORAGE
+========================================================= */
+
+/*
+ * This runs once when the app loads.
+ * It removes old oversized draft data.
+ */
+(function cleanupOldStorage() {
+
+    try {
+
+        const history =
+            loadChatHistory();
+
+        /*
+         * Re-save cleaned history.
+         */
+        if (history.length > 0) {
+
+            chatHistory =
+                history;
+
+            safeSet(
+                "hackerAnkitChatHistory",
+                JSON.stringify(
+                    history
+                )
+            );
+        }
+
+        /*
+         * Old drafts are not needed anymore.
+         */
+        safeRemove(
+            "hackerAnkitDraft"
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "⚠️ Storage cleanup skipped:",
+            error
+        );
+    }
+
+})();
+
+
+/* =========================================================
+   FINAL
+========================================================= */
+
 console.log(
     "✅ HACKER ANKIT AI frontend loaded successfully."
 );
+
+console.log(
+    "✅ Storage-safe mode enabled."
+);
+````
