@@ -184,7 +184,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         })
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Hacker Ankit is listening")
         }
         recognizer?.startListening(intent)
@@ -195,21 +195,50 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private fun handleCommand(raw: String) {
         val c = raw.lowercase(Locale.getDefault()).trim()
         if (c.isBlank()) return
+
         when {
             c.contains("youtube") -> openPackage("com.google.android.youtube", "YouTube")
             c.contains("instagram") -> openPackage("com.instagram.android", "Instagram")
             c.contains("whatsapp") -> openPackage("com.whatsapp", "WhatsApp")
             c.contains("chrome") -> openPackage("com.android.chrome", "Chrome")
             c.contains("github") -> openUrl("https://github.com", "GitHub")
-            c.contains("setting") -> { startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)); speak("Opening Settings.") }
-            c.contains("gallery") -> { startActivity(Intent(Intent.ACTION_VIEW).apply { type="image/*" }); speak("Opening Gallery.") }
-            c.contains("camera") -> { startActivity(Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)); speak("Opening Camera.") }
-            c.contains("torch") || c.contains("flash") -> toggleTorch()
-            c.startsWith("call ") || c.contains("call rahul") -> {
-                speak("Calling needs phone and contacts permission plus a user confirmation flow. Please use the contact screen on your device.")
-                startActivity(Intent(Intent.ACTION_DIAL))
+
+            c.contains("wifi") || c.contains("wi-fi") -> {
+                startActivity(Intent(android.provider.Settings.Panel.ACTION_WIFI))
+                speak("Opening Wi-Fi settings.")
             }
-            c.startsWith("open ") -> speak("I can open supported apps such as YouTube, Instagram, WhatsApp, Chrome, GitHub, Settings, Gallery and Camera.")
+
+            c.contains("bluetooth") -> {
+                startActivity(Intent(android.provider.Settings.Panel.ACTION_BLUETOOTH))
+                speak("Opening Bluetooth settings.")
+            }
+
+            c.contains("camera") -> {
+                startActivity(Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
+                speak("Opening Camera.")
+            }
+
+            c.contains("torch") || c.contains("flash") || c.contains("light") -> toggleTorch()
+
+            c.contains("setting") -> {
+                startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
+                speak("Opening Settings.")
+            }
+
+            c.contains("gallery") || c.contains("photos") -> {
+                startActivity(Intent(Intent.ACTION_VIEW).apply { type = "image/*" })
+                speak("Opening Gallery.")
+            }
+
+            c.startsWith("call ") -> {
+                startActivity(Intent(Intent.ACTION_DIAL))
+                speak("Opening phone.")
+            }
+
+            c.startsWith("open ") -> {
+                speak("I can open YouTube, Instagram, WhatsApp, Chrome, GitHub, Settings, Gallery and Camera.")
+            }
+
             else -> speak("Command received: $raw")
         }
     }
