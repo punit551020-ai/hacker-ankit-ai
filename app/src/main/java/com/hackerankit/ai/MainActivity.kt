@@ -209,7 +209,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             }
 
             c.contains("bluetooth") -> {
-                startActivity(Intent(android.provider.Settings.Panel.ACTION_BLUETOOTH))
+                startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS))
                 speak("Opening Bluetooth settings.")
             }
 
