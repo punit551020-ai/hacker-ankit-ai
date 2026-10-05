@@ -193,40 +193,54 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private fun stopListening() { recognizer?.stopListening(); recognizer?.destroy(); recognizer = null; listening = false }
 
     private fun handleCommand(raw: String) {
-        val c = raw.lowercase(Locale.getDefault()).trim()
+        var c = raw.lowercase(Locale.getDefault()).trim()
         if (c.isBlank()) return
 
-        when {
-            c.contains("youtube") -> openPackage("com.google.android.youtube", "YouTube")
-            c.contains("instagram") -> openPackage("com.instagram.android", "Instagram")
-            c.contains("whatsapp") -> openPackage("com.whatsapp", "WhatsApp")
-            c.contains("chrome") -> openPackage("com.android.chrome", "Chrome")
-            c.contains("github") -> openUrl("https://github.com", "GitHub")
+        c = normalizeCommand(c)
 
-            c.contains("wifi") || c.contains("wi-fi") -> {
+        when {
+            containsAny(c, "youtube", "you tube", "यूट्यूब") ->
+                openPackage("com.google.android.youtube", "YouTube")
+
+            containsAny(c, "instagram", "insta", "इंस्टाग्राम", "इंस्टा") ->
+                openPackage("com.instagram.android", "Instagram")
+
+            containsAny(c, "whatsapp", "व्हाट्सएप", "व्हाट्सऐप") ->
+                openPackage("com.whatsapp", "WhatsApp")
+
+            containsAny(c, "chrome", "क्रोम") ->
+                openPackage("com.android.chrome", "Chrome")
+
+            containsAny(c, "github", "git hub", "गिटहब") ->
+                openUrl("https://github.com", "GitHub")
+
+            containsAny(c, "wifi", "wi-fi", "वाईफाई", "वाई-फाई") -> {
                 startActivity(Intent(android.provider.Settings.Panel.ACTION_WIFI))
                 speak("Opening Wi-Fi settings.")
             }
 
-            c.contains("bluetooth") -> {
+            containsAny(c, "bluetooth", "ब्लूटूथ") -> {
                 startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS))
                 speak("Opening Bluetooth settings.")
             }
 
-            c.contains("camera") -> {
+            containsAny(c, "camera", "कैमरा") -> {
                 startActivity(Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
                 speak("Opening Camera.")
             }
 
-            c.contains("torch") || c.contains("flash") || c.contains("light") -> toggleTorch()
+            containsAny(c, "torch", "flash", "flashlight", "light", "टॉर्च", "फ्लैशलाइट") ->
+                toggleTorch()
 
-            c.contains("setting") -> {
+            containsAny(c, "settings", "setting", "सेटिंग्स", "सेटिंग") -> {
                 startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
                 speak("Opening Settings.")
             }
 
-            c.contains("gallery") || c.contains("photos") -> {
-                startActivity(Intent(Intent.ACTION_VIEW).apply { type = "image/*" })
+            containsAny(c, "gallery", "photos", "गैलरी") -> {
+                startActivity(Intent(Intent.ACTION_VIEW).apply {
+                    type = "image/*"
+                })
                 speak("Opening Gallery.")
             }
 
@@ -235,12 +249,41 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 speak("Opening phone.")
             }
 
-            c.startsWith("open ") -> {
+            c.startsWith("open ") ||
+                    c.startsWith("खोल ") ||
+                    c.startsWith("ओपन ") -> {
                 speak("I can open YouTube, Instagram, WhatsApp, Chrome, GitHub, Settings, Gallery and Camera.")
             }
 
             else -> speak("Command received: $raw")
         }
+    }
+
+    private fun normalizeCommand(command: String): String {
+        return command
+            .replace("इंस्टाग्राम", "instagram")
+            .replace("इंस्टा", "instagram")
+            .replace("यूट्यूब", "youtube")
+            .replace("व्हाट्सएप", "whatsapp")
+            .replace("व्हाट्सऐप", "whatsapp")
+            .replace("क्रोम", "chrome")
+            .replace("गिटहब", "github")
+            .replace("वाईफाई", "wifi")
+            .replace("वाई-फाई", "wifi")
+            .replace("ब्लूटूथ", "bluetooth")
+            .replace("टॉर्च", "torch")
+            .replace("फ्लैशलाइट", "flashlight")
+            .replace("कैमरा", "camera")
+            .replace("गैलरी", "gallery")
+            .replace("सेटिंग्स", "settings")
+            .replace("सेटिंग", "settings")
+    }
+
+    private fun containsAny(
+        command: String,
+        vararg words: String
+    ): Boolean {
+        return words.any { command.contains(it) }
     }
 
     private fun openPackage(pkg: String, label: String) {
