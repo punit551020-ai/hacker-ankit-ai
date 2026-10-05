@@ -162,19 +162,47 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun startListening() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestCorePermissions(); return
+            requestCorePermissions()
+            return
         }
+
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            speak("Speech recognition is not available on this device."); return
+            speak("Speech recognition is not available on this device.")
+            return
         }
+
+        recognizer?.destroy()
         recognizer = SpeechRecognizer.createSpeechRecognizer(this)
+
         recognizer?.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(p: Bundle?) { listening = true }
-            override fun onResults(results: Bundle?) {
-                val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-                listening = false; handleCommand(text); recognizer?.destroy()
+            override fun onReadyForSpeech(p: Bundle?) {
+                listening = true
             }
-            override fun onError(error: Int) { listening = false; recognizer?.destroy(); speak("I could not understand that command.") }
+
+            override fun onResults(results: Bundle?) {
+                val text = results
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()
+                    .orEmpty()
+
+                listening = false
+                recognizer?.destroy()
+                recognizer = null
+
+                if (text.isNotBlank()) {
+                    handleCommand(text)
+                } else {
+                    speak("I could not understand that command.")
+                }
+            }
+
+            override fun onError(error: Int) {
+                listening = false
+                recognizer?.destroy()
+                recognizer = null
+                speak("I could not understand that command.")
+            }
+
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(r: Float) {}
             override fun onBufferReceived(b: ByteArray?) {}
@@ -182,11 +210,27 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             override fun onPartialResults(p: Bundle?) {}
             override fun onEvent(t: Int, p: Bundle?) {}
         })
+
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            )
+
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "en-IN")
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true)
+                putStringArrayListExtra(
+                    RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES,
+                    arrayListOf("en-IN", "hi-IN")
+                )
+            }
+
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Hacker Ankit is listening")
         }
+
         recognizer?.startListening(intent)
     }
 
