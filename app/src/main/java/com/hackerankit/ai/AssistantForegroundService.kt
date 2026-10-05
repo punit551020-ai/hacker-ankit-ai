@@ -1,4 +1,3 @@
-}
 package com.hackerankit.ai
 
 import android.app.*
