@@ -1,4 +1,3 @@
-
 package com.hackerankit.ai
 
 import android.Manifest
@@ -25,6 +24,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private lateinit var root: FrameLayout
     private lateinit var tts: TextToSpeech
 
+    private var ttsReady = false
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
     private var torchOn = false
@@ -520,6 +520,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             return
         }
 
+        stopListening()
+
         recognizer =
             SpeechRecognizer.createSpeechRecognizer(
                 this
@@ -551,7 +553,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     recognizer?.destroy()
                     recognizer = null
 
-                    handleCommand(text)
+                    if (text.isBlank()) {
+                        speak("I did not hear a command.")
+                    } else {
+                        handleCommand(text)
+                    }
                 }
 
                 override fun onError(
@@ -563,18 +569,42 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     recognizer?.destroy()
                     recognizer = null
 
-                    speak(
-                        "I could not understand that command."
-                    )
+                    when (error) {
+
+                        SpeechRecognizer.ERROR_NO_MATCH -> {
+                            speak("I could not understand that.")
+                        }
+
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
+                            speak("I did not hear anything.")
+                        }
+
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
+                            speak("Microphone permission is required.")
+                        }
+
+                        else -> {
+                            speak("Voice recognition failed.")
+                        }
+                    }
                 }
 
                 override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {}
-                override fun onBufferReceived(buffer: ByteArray?) {}
+
+                override fun onRmsChanged(
+                    rmsdB: Float
+                ) {}
+
+                override fun onBufferReceived(
+                    buffer: ByteArray?
+                ) {}
+
                 override fun onEndOfSpeech() {}
+
                 override fun onPartialResults(
                     partialResults: Bundle?
                 ) {}
+
                 override fun onEvent(
                     eventType: Int,
                     params: Bundle?
@@ -594,12 +624,17 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
                 putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE,
-                    Locale.getDefault()
+                    Locale("en", "IN")
                 )
 
                 putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
-                    Locale.getDefault().language
+                    "en-IN"
+                )
+
+                putExtra(
+                    RecognizerIntent.EXTRA_PARTIAL_RESULTS,
+                    false
                 )
 
                 putExtra(
@@ -608,25 +643,43 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 )
             }
 
-        recognizer?.startListening(intent)
+        try {
+
+            recognizer?.startListening(intent)
+
+        } catch (_: Exception) {
+
+            listening = false
+
+            recognizer?.destroy()
+            recognizer = null
+
+            speak(
+                "I could not start voice recognition."
+            )
+        }
     }
 
     private fun stopListening() {
 
-        recognizer?.stopListening()
+        try {
+            recognizer?.stopListening()
+        } catch (_: Exception) {
+        }
 
-        recognizer?.destroy()
+        try {
+            recognizer?.cancel()
+        } catch (_: Exception) {
+        }
+
+        try {
+            recognizer?.destroy()
+        } catch (_: Exception) {
+        }
 
         recognizer = null
-
         listening = false
     }
-
-    /*
-     * MAIN COMMAND ENGINE
-     *
-     * Supports English + common Hindi/Hinglish words.
-     */
 
     private fun handleCommand(raw: String) {
 
@@ -637,14 +690,38 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
         if (c.isBlank()) return
 
-        // Hindi speech recognition may return Devanagari.
         c = normalizeCommand(c)
 
-        when {
+        /*
+         * If the user says:
+         *
+         * "Ankit YouTube open"
+         * "Ankit Instagram open"
+         * "Ankit WhatsApp open"
+         *
+         * remove the assistant name first.
+         */
 
-            // -------------------------
-            // YOUTUBE
-            // -------------------------
+        val name =
+            assistantName
+                .lowercase(Locale.getDefault())
+                .trim()
+
+        if (name.isNotEmpty()) {
+
+            c = c
+                .removePrefix(name)
+                .trim()
+        }
+
+        // Also handle common speech-recognition variations.
+        c = c
+            .removePrefix("hey ankit")
+            .removePrefix("okay ankit")
+            .removePrefix("ok ankit")
+            .trim()
+
+        when {
 
             containsAny(
                 c,
@@ -658,10 +735,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     "YouTube"
                 )
             }
-
-            // -------------------------
-            // INSTAGRAM
-            // -------------------------
 
             containsAny(
                 c,
@@ -677,10 +750,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 )
             }
 
-            // -------------------------
-            // WHATSAPP
-            // -------------------------
-
             containsAny(
                 c,
                 "whatsapp",
@@ -694,10 +763,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 )
             }
 
-            // -------------------------
-            // CHROME
-            // -------------------------
-
             containsAny(
                 c,
                 "chrome",
@@ -709,10 +774,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     "Chrome"
                 )
             }
-
-            // -------------------------
-            // GITHUB
-            // -------------------------
 
             containsAny(
                 c,
@@ -727,10 +788,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 )
             }
 
-            // -------------------------
-            // WI-FI
-            // -------------------------
-
             containsAny(
                 c,
                 "wifi",
@@ -743,10 +800,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 openWifiSettings()
             }
 
-            // -------------------------
-            // BLUETOOTH
-            // -------------------------
-
             containsAny(
                 c,
                 "bluetooth",
@@ -756,10 +809,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
                 openBluetoothSettings()
             }
-
-            // -------------------------
-            // TORCH / LIGHT
-            // -------------------------
 
             containsAny(
                 c,
@@ -777,10 +826,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 toggleTorch()
             }
 
-            // -------------------------
-            // SETTINGS
-            // -------------------------
-
             containsAny(
                 c,
                 "settings",
@@ -791,10 +836,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
                 openSystemSettings()
             }
-
-            // -------------------------
-            // GALLERY
-            // -------------------------
 
             containsAny(
                 c,
@@ -808,10 +849,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 openGallery()
             }
 
-            // -------------------------
-            // CAMERA
-            // -------------------------
-
             containsAny(
                 c,
                 "camera",
@@ -820,10 +857,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
                 openCamera()
             }
-
-            // -------------------------
-            // OFFLINE MODE
-            // -------------------------
 
             containsAny(
                 c,
@@ -855,10 +888,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 )
             }
 
-            // -------------------------
-            // ASSISTANT ON/OFF
-            // -------------------------
-
             containsAny(
                 c,
                 "assistant on",
@@ -881,40 +910,47 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 setAssistantActive(false)
             }
 
-            // -------------------------
-            // CALL
-            // -------------------------
-
             c.startsWith("call ") ||
                     c.startsWith("कॉल ") -> {
 
                 speak(
-                    "Calling needs a user confirmation flow. Opening the phone dialer."
+                    "Opening the phone dialer."
                 )
 
-                startActivity(
-                    Intent(
-                        Intent.ACTION_DIAL
+                try {
+
+                    startActivity(
+                        Intent(
+                            Intent.ACTION_DIAL
+                        )
                     )
-                )
-            }
 
-            // -------------------------
-            // OPEN UNKNOWN APP
-            // -------------------------
+                } catch (_: Exception) {
+
+                    speak(
+                        "Phone dialer could not be opened."
+                    )
+                }
+            }
 
             c.startsWith("open ") ||
                     c.startsWith("खोल ") ||
                     c.startsWith("ओपन ") -> {
 
                 speak(
-                    "I can open supported apps such as YouTube, Instagram, WhatsApp, Chrome, GitHub, Settings, Gallery and Camera."
+                    "I can open YouTube, Instagram, WhatsApp, Chrome, GitHub, Settings, Gallery and Camera."
                 )
             }
 
-            // -------------------------
-            // UNKNOWN
-            // -------------------------
+            c == name ||
+                    c == "hey ankit" ||
+                    c == "okay ankit" ||
+                    c == "ok ankit" -> {
+
+                speak(
+                    "Yes, I am listening."
+                )
+            }
 
             else -> {
 
@@ -930,70 +966,22 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     ): String {
 
         return command
-            .replace(
-                "इंस्टाग्राम",
-                "instagram"
-            )
-            .replace(
-                "इंस्टा",
-                "instagram"
-            )
-            .replace(
-                "यूट्यूब",
-                "youtube"
-            )
-            .replace(
-                "व्हाट्सएप",
-                "whatsapp"
-            )
-            .replace(
-                "व्हाट्सऐप",
-                "whatsapp"
-            )
-            .replace(
-                "क्रोम",
-                "chrome"
-            )
-            .replace(
-                "गिटहब",
-                "github"
-            )
-            .replace(
-                "वाईफाई",
-                "wifi"
-            )
-            .replace(
-                "वाई-फाई",
-                "wifi"
-            )
-            .replace(
-                "ब्लूटूथ",
-                "bluetooth"
-            )
-            .replace(
-                "टॉर्च",
-                "torch"
-            )
-            .replace(
-                "फ्लैशलाइट",
-                "flashlight"
-            )
-            .replace(
-                "कैमरा",
-                "camera"
-            )
-            .replace(
-                "गैलरी",
-                "gallery"
-            )
-            .replace(
-                "सेटिंग्स",
-                "settings"
-            )
-            .replace(
-                "सेटिंग",
-                "settings"
-            )
+            .replace("इंस्टाग्राम", "instagram")
+            .replace("इंस्टा", "instagram")
+            .replace("यूट्यूब", "youtube")
+            .replace("व्हाट्सएप", "whatsapp")
+            .replace("व्हाट्सऐप", "whatsapp")
+            .replace("क्रोम", "chrome")
+            .replace("गिटहब", "github")
+            .replace("वाईफाई", "wifi")
+            .replace("वाई-फाई", "wifi")
+            .replace("ब्लूटूथ", "bluetooth")
+            .replace("टॉर्च", "torch")
+            .replace("फ्लैशलाइट", "flashlight")
+            .replace("कैमरा", "camera")
+            .replace("गैलरी", "gallery")
+            .replace("सेटिंग्स", "settings")
+            .replace("सेटिंग", "settings")
     }
 
     private fun containsAny(
@@ -1022,11 +1010,20 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 Intent.FLAG_ACTIVITY_NEW_TASK
             )
 
-            startActivity(intent)
+            try {
 
-            speak(
-                "Opening $label."
-            )
+                startActivity(intent)
+
+                speak(
+                    "Opening $label."
+                )
+
+            } catch (_: Exception) {
+
+                speak(
+                    "I could not open $label."
+                )
+            }
 
         } else {
 
@@ -1062,13 +1059,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    /*
-     * Modern Android does not allow ordinary apps
-     * to silently switch Wi-Fi on/off.
-     *
-     * So we open the system Wi-Fi panel/settings.
-     */
-
     private fun openWifiSettings() {
 
         try {
@@ -1096,18 +1086,22 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
         } catch (_: Exception) {
 
-            startActivity(
-                Intent(
-                    Settings.ACTION_WIFI_SETTINGS
+            try {
+
+                startActivity(
+                    Intent(
+                        Settings.ACTION_WIFI_SETTINGS
+                    )
                 )
-            )
+
+            } catch (_: Exception) {
+
+                speak(
+                    "Wi-Fi settings could not be opened."
+                )
+            }
         }
     }
-
-    /*
-     * Modern Android restricts apps from directly
-     * enabling/disabling Bluetooth.
-     */
 
     private fun openBluetoothSettings() {
 
@@ -1295,7 +1289,34 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         text: String
     ) {
 
-        if (::tts.isInitialized) {
+        if (!::tts.isInitialized) return
+
+        if (!ttsReady) {
+
+            Handler(Looper.getMainLooper())
+                .postDelayed({
+
+                    if (ttsReady) {
+
+                        try {
+
+                            tts.speak(
+                                text,
+                                TextToSpeech.QUEUE_FLUSH,
+                                null,
+                                "hacker-ankit"
+                            )
+
+                        } catch (_: Exception) {
+                        }
+                    }
+
+                }, 500)
+
+            return
+        }
+
+        try {
 
             tts.speak(
                 text,
@@ -1303,6 +1324,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 null,
                 "hacker-ankit"
             )
+
+        } catch (_: Exception) {
         }
     }
 
@@ -1314,10 +1337,21 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 AssistantForegroundService::class.java
             )
 
-        ContextCompat.startForegroundService(
-            this,
-            intent
-        )
+        try {
+
+            ContextCompat.startForegroundService(
+                this,
+                intent
+            )
+
+        } catch (_: Exception) {
+
+            Toast.makeText(
+                this,
+                "Assistant service could not start.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     private fun stopAssistantService() {
@@ -1334,12 +1368,25 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         status: Int
     ) {
 
-        if (status ==
-            TextToSpeech.SUCCESS
-        ) {
+        if (status == TextToSpeech.SUCCESS) {
 
-            tts.language =
-                Locale.getDefault()
+            ttsReady = true
+
+            var result =
+                tts.setLanguage(
+                    Locale("en", "IN")
+                )
+
+            if (
+                result == TextToSpeech.LANG_MISSING_DATA ||
+                result == TextToSpeech.LANG_NOT_SUPPORTED
+            ) {
+
+                result =
+                    tts.setLanguage(
+                        Locale.US
+                    )
+            }
 
             prefs.getString(
                 "voice",
@@ -1354,6 +1401,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                         tts.voice = it
                     }
             }
+        } else {
+
+            ttsReady = false
         }
     }
 
